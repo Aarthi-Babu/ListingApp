@@ -24,6 +24,7 @@ class ListViewModel : ViewModel() {
                         User(
                             it.cell, it.name.first,
                             it.name.last
+//                            it.picture.thumbnail
                         )
                     }
                     if (user != null) {
