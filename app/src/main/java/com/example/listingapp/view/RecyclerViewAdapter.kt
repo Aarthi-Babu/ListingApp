@@ -8,13 +8,14 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.example.listingapp.R
 import com.example.listingapp.database.User
 
 
 class RecyclerViewAdapter(
-    context: Context,
-    private val itemList: List<User>
+    private val context: Context,
+    private var itemList: List<User>
 ) : RecyclerView.Adapter<RecyclerViewAdapter.SampleViewHolders>() {
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SampleViewHolders {
         val layoutView: View = LayoutInflater.from(parent.context).inflate(
@@ -24,15 +25,21 @@ class RecyclerViewAdapter(
     }
 
     override fun onBindViewHolder(holder: SampleViewHolders, position: Int) {
-//        Glide.with(context)
-//            .load(itemList[position].thumbnail)
-//            .centerCrop()
-//            .into(holder.image);
-        holder.authorName.text = (itemList[position].firstName).toString()
+        Glide.with(context)
+            .load(itemList[position].thumbnail)
+            .centerCrop()
+            .into(holder.image)
+        holder.authorName.text =
+            (itemList[position].firstName + " " + itemList[position].lastName)
     }
 
     override fun getItemCount(): Int {
         return itemList.size
+    }
+
+    fun filterList(filterList: List<User>) {
+        itemList = filterList
+        notifyDataSetChanged()
     }
 
     inner class SampleViewHolders(itemView: View) : RecyclerView.ViewHolder(itemView),

@@ -23,8 +23,8 @@ class ListViewModel : ViewModel() {
                     val user = userResponse?.results?.get(i)?.let {
                         User(
                             it.cell, it.name.first,
-                            it.name.last
-//                            it.picture.thumbnail
+                            it.name.last,
+                            it.picture.thumbnail
                         )
                     }
                     if (user != null) {
