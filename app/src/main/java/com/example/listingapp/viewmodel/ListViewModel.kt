@@ -24,8 +24,15 @@ class ListViewModel : ViewModel() {
                         User(
                             it.cell, it.name.first,
                             it.name.last,
-                            it.picture.thumbnail
-                        )
+                            it.picture.thumbnail,
+                            it.dob.age.toString(),
+                            it.email,
+                            it.phone,
+                            it.gender,
+                            it.location.city,
+                            it.dob.date,
+
+                            )
                     }
                     if (user != null) {
                         users.add(user)

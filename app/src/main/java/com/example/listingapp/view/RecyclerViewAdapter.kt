@@ -6,7 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import android.widget.Toast
+import androidx.cardview.widget.CardView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.listingapp.R
@@ -15,7 +15,8 @@ import com.example.listingapp.database.User
 
 class RecyclerViewAdapter(
     private val context: Context,
-    private var itemList: List<User>
+    private var itemList: List<User>,
+    private val clickListener: (position: Int) -> Unit
 ) : RecyclerView.Adapter<RecyclerViewAdapter.SampleViewHolders>() {
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SampleViewHolders {
         val layoutView: View = LayoutInflater.from(parent.context).inflate(
@@ -29,8 +30,9 @@ class RecyclerViewAdapter(
             .load(itemList[position].thumbnail)
             .centerCrop()
             .into(holder.image)
-        holder.authorName.text =
+        holder.name.text =
             (itemList[position].firstName + " " + itemList[position].lastName)
+        holder.bind(itemList[position])
     }
 
     override fun getItemCount(): Int {
@@ -42,23 +44,18 @@ class RecyclerViewAdapter(
         notifyDataSetChanged()
     }
 
-    inner class SampleViewHolders(itemView: View) : RecyclerView.ViewHolder(itemView),
-        View.OnClickListener {
-        var image: ImageView
-        var authorName: TextView
-        override fun onClick(view: View) {
-            Toast.makeText(
-                view.context,
-                "Clicked Position = $adapterPosition", Toast.LENGTH_SHORT
-            )
-                .show()
-        }
+    inner class SampleViewHolders(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        var image: ImageView = itemView.findViewById(R.id.image)
+        var name: TextView = itemView.findViewById(R.id.name)
+        var cardView: CardView = itemView.findViewById(R.id.card_view)
+        fun bind(item: User) {
+            cardView.setOnClickListener {
+                clickListener(adapterPosition)
 
-        init {
-            itemView.setOnClickListener(this)
-            authorName = itemView.findViewById(R.id.AuthorName)
-            image = itemView.findViewById(R.id.image)
+            }
+
         }
     }
+
 
 }
