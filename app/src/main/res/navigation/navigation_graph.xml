@@ -19,7 +19,6 @@
         <argument
             android:name="position"
             android:defaultValue="0"
-            app:argType="string"
-            app:nullable="true" />
+            app:argType="integer" />
     </fragment>
 </navigation>

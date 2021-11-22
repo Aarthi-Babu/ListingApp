@@ -18,7 +18,6 @@ import com.example.listingapp.viewmodel.ListViewModel
 class DetailsFragment : Fragment(R.layout.fragment_user_details) {
     private lateinit var binding: FragmentUserDetailsBinding
     private val viewModel by viewModels<ListViewModel>()
-    private var position = 0
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -36,7 +35,7 @@ class DetailsFragment : Fragment(R.layout.fragment_user_details) {
     }
 
     private fun loadData() {
-        //        val position = Detai.fromBundle(requireArguments()).position
+                val position = DetailsFragmentArgs.fromBundle(requireArguments()).position
         val dbHelper = context?.let { UserDatabase.DatabaseBuilder.getInstance(it) }?.let {
             DatabaseHelperImpl(
                 it
@@ -46,12 +45,10 @@ class DetailsFragment : Fragment(R.layout.fragment_user_details) {
             viewModel.fetchDataFromDb(dbHelper)
         }
         viewModel.userDetailsFromDb.observe(viewLifecycleOwner, { list ->
-            binding.firstName.text = list[position].firstName
-            binding.lastName.text = list[position].lastName
-            binding.age.text = list[position].age
+            binding.firstName.text = list[position].firstName + " " + list[position].lastName
+            binding.ageVal.text = list[position].age
             binding.genderVal.text = list[position].gender
             binding.cityVal.text = list[position].city
-            binding.dobVal.text = list[position].dob
             binding.phoneVal.text = list[position].phone
             binding.emailVal.text = list[position].email
             context?.let {

@@ -7,15 +7,18 @@ import com.example.listingapp.api.ListingRepository
 import com.example.listingapp.database.DatabaseHelperImpl
 import com.example.listingapp.database.User
 import com.example.listingapp.model.ResponseModel
+import com.example.listingapp.model.WeatherModel
 import kotlinx.coroutines.launch
 
 class ListViewModel : ViewModel() {
     val userDetailsResponse = MutableLiveData<ResponseModel>()
+    val weatherModel: MutableLiveData<WeatherModel> by lazy { MutableLiveData<WeatherModel>() }
     val userDetailsFromDb = MutableLiveData<List<User>>()
+    private val listingRepository: ListingRepository by lazy { ListingRepository() }
     fun getUserDetails(dbHelper: DatabaseHelperImpl) {
         var userResponse: ResponseModel?
         viewModelScope.launch {
-            userResponse = ListingRepository().getDetails()
+            userResponse = listingRepository.getDetails()
             val users = mutableListOf<User>()
             val len = userResponse?.results?.size
             if (len != null)
@@ -24,7 +27,7 @@ class ListViewModel : ViewModel() {
                         User(
                             it.cell, it.name.first,
                             it.name.last,
-                            it.picture.thumbnail,
+                            it.picture.large,
                             it.dob.age.toString(),
                             it.email,
                             it.phone,
@@ -49,4 +52,10 @@ class ListViewModel : ViewModel() {
         }
     }
 
+    fun getWeatherDetails(latitude: Int, longitude: Int) {
+        viewModelScope.launch {
+            val weatherResponse = listingRepository.getWeatherData(latitude, longitude)
+            weatherModel.postValue(weatherResponse)
+        }
+    }
 }

@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.cardview.widget.CardView
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.listingapp.R
@@ -18,6 +19,8 @@ class RecyclerViewAdapter(
     private var itemList: List<User>,
     private val clickListener: (position: Int) -> Unit
 ) : RecyclerView.Adapter<RecyclerViewAdapter.SampleViewHolders>() {
+//    private val set = ConstraintSet()
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SampleViewHolders {
         val layoutView: View = LayoutInflater.from(parent.context).inflate(
             R.layout.list_item, null
@@ -33,6 +36,9 @@ class RecyclerViewAdapter(
         holder.name.text =
             (itemList[position].firstName + " " + itemList[position].lastName)
         holder.bind(itemList[position])
+//        set.clone(holder.mConstraintLayout)
+//        set.setDimensionRatio(holder.image)
+//        set.applyTo(holder.mConstraintLayout)
     }
 
     override fun getItemCount(): Int {
@@ -47,6 +53,7 @@ class RecyclerViewAdapter(
     inner class SampleViewHolders(itemView: View) : RecyclerView.ViewHolder(itemView) {
         var image: ImageView = itemView.findViewById(R.id.image)
         var name: TextView = itemView.findViewById(R.id.name)
+        var mConstraintLayout: ConstraintLayout = itemView.findViewById(R.id.mConstraintLayout)
         var cardView: CardView = itemView.findViewById(R.id.card_view)
         fun bind(item: User) {
             cardView.setOnClickListener {
