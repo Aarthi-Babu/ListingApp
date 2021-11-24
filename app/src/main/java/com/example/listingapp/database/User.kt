@@ -15,5 +15,7 @@ data class User(
     @ColumnInfo(name = "phone") val phone: String?,
     @ColumnInfo(name = "gender") val gender: String?,
     @ColumnInfo(name = "city") val city: String?,
-    @ColumnInfo(name = "dob") val dob: String?
+    @ColumnInfo(name = "dob") val dob: String?,
+    @ColumnInfo(name = "lat") val latitude: Double?,
+    @ColumnInfo(name = "long") val longitude: Double?
 )

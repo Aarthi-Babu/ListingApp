@@ -1,10 +1,10 @@
 package com.example.listingapp.view
 
-import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import com.bumptech.glide.Glide
@@ -16,19 +16,19 @@ import com.example.listingapp.viewmodel.ListViewModel
 
 
 class DetailsFragment : Fragment(R.layout.fragment_user_details) {
-    private lateinit var binding: FragmentUserDetailsBinding
+    private var _binding: FragmentUserDetailsBinding? = null
     private val viewModel by viewModels<ListViewModel>()
+    private val binding get() = this._binding!!
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        binding = FragmentUserDetailsBinding.inflate(inflater, container, false)
-        return binding.root
+        _binding = FragmentUserDetailsBinding.inflate(inflater, container, false)
+        return this.binding.root
     }
 
-    @SuppressLint("SetTextI18n")
     override fun onStart() {
         super.onStart()
         loadData()
@@ -45,19 +45,41 @@ class DetailsFragment : Fragment(R.layout.fragment_user_details) {
             viewModel.fetchDataFromDb(dbHelper)
         }
         viewModel.userDetailsFromDb.observe(viewLifecycleOwner, { list ->
-            binding.firstName.text = list[position].firstName + " " + list[position].lastName
-            binding.ageVal.text = list[position].age
-            binding.genderVal.text = list[position].gender
-            binding.cityVal.text = list[position].city
-            binding.phoneVal.text = list[position].phone
-            binding.emailVal.text = list[position].email
+            this.binding.firstName.text = list[position].firstName + " " + list[position].lastName
+            this.binding.ageVal.text = list[position].age
+            this.binding.genderVal.text = list[position].gender
+            this.binding.cityVal.text = list[position].city
+            this.binding.phoneVal.text = list[position].phone
+            this.binding.emailVal.text = list[position].email
             context?.let {
                 Glide.with(it)
                     .load(list[position].thumbnail)
                     .centerCrop()
-                    .into(binding.profileImg)
+                    .into(this.binding.profileImg)
+            }
+            list[position].longitude?.let {
+                list[position].latitude?.let { it1 ->
+                    getWeatherData(
+                        it1,
+                        it
+                    )
+                }
             }
         })
     }
 
+    private fun getWeatherData(lat: Double, longitude: Double) {
+        viewModel.getWeatherDetails(lat, longitude)
+        viewModel.weatherModel.observe(viewLifecycleOwner, {
+            Toast.makeText(context, it.wind?.deg.toString(), Toast.LENGTH_SHORT).show()
+            this.binding.toolbar.setTemperature(it.wind?.deg.toString())
+            it.name?.let { it1 -> this.binding.toolbar.setCity(it1) }
+            it.weather?.firstOrNull()?.description?.let { it1 -> this.binding.toolbar.setArea(it1) }
+        })
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        _binding = null
+    }
 }

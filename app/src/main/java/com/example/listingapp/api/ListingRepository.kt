@@ -34,7 +34,7 @@ class ListingRepository {
         return service?.retrieveDetails()
     }
 
-    suspend fun getWeatherData(latitude: Int, longitude: Int): WeatherModel? {
+    suspend fun getWeatherData(latitude: Double, longitude: Double): WeatherModel? {
         getRetrofitBuilder(1)
         return service?.getWeatherInfo(latitude, longitude)
     }

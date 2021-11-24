@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="custom_component_attributes">
+        <attr name="title" format="string" />
+        <attr name="temperature" format="string" />
+        <attr name="city" format="string" />
+        <attr name="area" format="string" />
+    </declare-styleable>
+</resources>

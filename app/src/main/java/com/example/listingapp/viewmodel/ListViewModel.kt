@@ -11,9 +11,9 @@ import com.example.listingapp.model.WeatherModel
 import kotlinx.coroutines.launch
 
 class ListViewModel : ViewModel() {
-    val userDetailsResponse = MutableLiveData<ResponseModel>()
+    val userDetailsResponse = MutableLiveData<ArrayList<User>>()
     val weatherModel: MutableLiveData<WeatherModel> by lazy { MutableLiveData<WeatherModel>() }
-    val userDetailsFromDb = MutableLiveData<List<User>>()
+    val userDetailsFromDb = MutableLiveData<ArrayList<User>>()
     private val listingRepository: ListingRepository by lazy { ListingRepository() }
     fun getUserDetails(dbHelper: DatabaseHelperImpl) {
         var userResponse: ResponseModel?
@@ -34,28 +34,42 @@ class ListViewModel : ViewModel() {
                             it.gender,
                             it.location.city,
                             it.dob.date,
+                            it.location.coordinates.latitude.toDouble(),
+                            it.location.coordinates.longitude.toDouble()
 
-                            )
+                        )
                     }
                     if (user != null) {
                         users.add(user)
                     }
                 }
+//            dbHelper.nukeTable()
             dbHelper.insertAll(users)
-            userDetailsResponse.postValue(userResponse)
+            if (userDetailsResponse.value?.isNotEmpty() == true) {
+                userDetailsResponse.value?.addAll(users as ArrayList<User>)
+                userDetailsResponse.notifyObserver()
+            } else {
+                userDetailsResponse.postValue(users as ArrayList<User>)
+            }
+            fetchDataFromDb(dbHelper)
         }
+    }
+
+    fun <T> MutableLiveData<T>.notifyObserver() {
+        this.value = this.value
     }
 
     fun fetchDataFromDb(dbHelper: DatabaseHelperImpl) {
         viewModelScope.launch {
-            userDetailsFromDb.postValue(dbHelper.getUsers())
+            userDetailsFromDb.postValue(dbHelper.getUsers() as ArrayList<User>?)
         }
     }
 
-    fun getWeatherDetails(latitude: Int, longitude: Int) {
+    fun getWeatherDetails(latitude: Double, longitude: Double) {
         viewModelScope.launch {
             val weatherResponse = listingRepository.getWeatherData(latitude, longitude)
             weatherModel.postValue(weatherResponse)
         }
     }
+
 }

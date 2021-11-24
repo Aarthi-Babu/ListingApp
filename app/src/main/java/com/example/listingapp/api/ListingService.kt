@@ -13,9 +13,9 @@ interface ListingService {
 
     @GET("weather")
     suspend fun getWeatherInfo(
-        @Query("lat") lat: Int = 13,
-        @Query("lon") lon: Int = 80,
-        @Query("appid") apiKey: String = "38781e38750a335dd868104f722abf5d",
+        @Query("lat") lat: Double = 28.00,
+        @Query("lon") lon: Double = 77.00,
+        @Query("appid") apiKey: String = "38781e38750a335dd868104f722abf5d"
     ): WeatherModel
 }
 
