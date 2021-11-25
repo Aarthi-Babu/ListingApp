@@ -1,20 +1,17 @@
 package com.example.listingapp.view
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.util.AttributeSet
 import android.view.LayoutInflater
-import android.widget.LinearLayout
 import com.example.listingapp.R
 import com.example.listingapp.databinding.CustomToolbarBinding
+import com.google.android.material.appbar.MaterialToolbar
 
-@SuppressLint("CustomViewStyleable")
 class CustomToolbar @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyle: Int = 0,
-    defStyleRes: Int = 0
-) : LinearLayout(context, attrs, defStyle, defStyleRes) {
+    defStyle: Int = R.attr.toolbarStyle,
+) : MaterialToolbar(context, attrs, defStyle) {
     private var binding: CustomToolbarBinding =
         CustomToolbarBinding.inflate(LayoutInflater.from(context), this, true)
 
@@ -25,6 +22,7 @@ class CustomToolbar @JvmOverloads constructor(
             0,
             0
         )
+        setContentInsetsAbsolute(0, 0)
         val title = a.getString(R.styleable.custom_component_attributes_title)
         val temperature = a.getString(R.styleable.custom_component_attributes_temperature)
         val city = a.getString(R.styleable.custom_component_attributes_city)
@@ -36,11 +34,7 @@ class CustomToolbar @JvmOverloads constructor(
         a.recycle()
     }
 
-    fun setTitle(text: String) {
-        binding.pageTitle.text = text
-    }
 
-    @SuppressLint("SetTextI18n")
     fun setTemperature(text: String) {
         binding.vTemperature.text = "$text°"
     }

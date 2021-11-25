@@ -14,14 +14,14 @@ import com.example.listingapp.databinding.FragmentUserDetailsBinding
 import com.example.listingapp.di.AppModule
 import com.example.listingapp.utils.ProgressDialog
 import com.example.listingapp.utils.Resource
-import com.example.listingapp.utils.Utils
-import com.example.listingapp.utils.Utils.setStatusBarColor
+import com.example.listingapp.utils.isNetworkAvailable
+import com.example.listingapp.utils.setStatusBarColor
 import com.example.listingapp.viewmodel.ListViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class DetailsFragment : Fragment(R.layout.fragment_user_details) {
+class DetailsFragment : Fragment() {
     private var _binding: FragmentUserDetailsBinding? = null
     private val viewModel: ListViewModel by activityViewModels()
     private val binding get() = _binding!!
@@ -39,7 +39,8 @@ class DetailsFragment : Fragment(R.layout.fragment_user_details) {
         return this.binding.root
     }
 
-    override fun onStart() {
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
         super.onStart()
         activity?.setStatusBarColor(R.color.purple_500)
         loadData()
@@ -47,7 +48,7 @@ class DetailsFragment : Fragment(R.layout.fragment_user_details) {
 
     private fun loadData() {
         val position = DetailsFragmentArgs.fromBundle(requireArguments()).position
-        if (Utils.isNetworkAvailable(context)) {
+        if (isNetworkAvailable(context)) {
             viewModel.userDetailsResponse.value?.let {
                 populateData(it, position)
             }
@@ -75,18 +76,18 @@ class DetailsFragment : Fragment(R.layout.fragment_user_details) {
                 .centerCrop()
                 .into(binding.profileImg)
         }
-        list[position].longitude?.let {
-            list[position].latitude?.let { it1 ->
+        list[position].longitude?.let { longitude ->
+            list[position].latitude?.let { lat ->
                 getWeatherData(
-                    it1,
-                    it
+                    lat,
+                    longitude
                 )
             }
         }
     }
 
     private fun getWeatherData(lat: Double, longitude: Double) {
-        viewModel.getWeatherDetails(lat, longitude).observe(this) { resource ->
+        viewModel.getWeatherDetails(lat, longitude).observe(viewLifecycleOwner) { resource ->
             when (resource.status) {
                 Resource.Status.SUCCESS -> {
                     progressDialog.hideLoading()

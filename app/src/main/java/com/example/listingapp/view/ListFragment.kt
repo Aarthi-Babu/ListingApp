@@ -21,6 +21,7 @@ import android.view.animation.TranslateAnimation
 import android.widget.SearchView
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -35,8 +36,8 @@ import com.example.listingapp.databinding.FragmentListBinding
 import com.example.listingapp.di.AppModule
 import com.example.listingapp.utils.ProgressDialog
 import com.example.listingapp.utils.Resource
-import com.example.listingapp.utils.Utils
-import com.example.listingapp.utils.Utils.setStatusBarColor
+import com.example.listingapp.utils.isNetworkAvailable
+import com.example.listingapp.utils.setStatusBarColor
 import com.example.listingapp.viewmodel.ListViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -45,7 +46,7 @@ import javax.inject.Inject
 import kotlin.collections.ArrayList
 
 @AndroidEntryPoint
-class ListFragment : Fragment(R.layout.fragment_list) {
+class ListFragment : Fragment() {
     private var _binding: FragmentListBinding? = null
     private val viewModel: ListViewModel by activityViewModels()
     private var adapter: RecyclerViewAdapter? = null
@@ -67,7 +68,8 @@ class ListFragment : Fragment(R.layout.fragment_list) {
 
     }
 
-    override fun onStart() {
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
         super.onStart()
         activity?.setStatusBarColor(R.color.purple_500)
         locationManager = activity?.getSystemService(Context.LOCATION_SERVICE) as LocationManager
@@ -80,19 +82,44 @@ class ListFragment : Fragment(R.layout.fragment_list) {
         loadData()
         recyclerView()
         viewListener()
+//        val permissionsResultCallback = registerForActivityResult(
+//            ActivityResultContracts.RequestPermission()
+//        ) {
+//            when (it) {
+//                true -> {
+//                    println("Permission has been granted by user")
+//                }
+//                false -> {
+//                    Toast.makeText(requireContext(), "Permission denied", Toast.LENGTH_SHORT).show()
+//                }
+//            }
+//        }
     }
 
     private fun invokeDB() {
-        val dbHelper = context?.let { UserDatabase.DatabaseBuilder.getInstance(it) }?.let {
-            DatabaseHelperImpl(
-                it
-            )
+        val dbHelper =
+            context?.let { DatabaseHelperImpl(UserDatabase.DatabaseBuilder.getInstance(it)) }
+        dbHelper?.let {
+            viewModel.getUserDetails(it).observe(viewLifecycleOwner) { resource ->
+                when (resource.status) {
+                    Resource.Status.SUCCESS -> {
+                        binding.progressBar.isVisible = false
+                    }
+                    Resource.Status.ERROR -> {
+                        binding.progressBar.isVisible = false
+                        Toast.makeText(context, "user api error.", Toast.LENGTH_SHORT).show()
+                    }
+                    Resource.Status.LOADING -> {
+                        binding.progressBar.isVisible = true
+                    }
+                }
+            }
         }
         dbHelper?.let { viewModel.getUserDetails(it) }
     }
 
     private fun loadData() {
-        if (Utils.isNetworkAvailable(context)) {
+        if (isNetworkAvailable(context)) {
             viewModel.userDetailsResponse.observeForever {
                 lifecycleScope.launch {
                     adapter?.addData(it)
@@ -116,14 +143,11 @@ class ListFragment : Fragment(R.layout.fragment_list) {
         )
         binding.recyclerView.layoutManager = sGridLayoutManager
 
-        adapter = context?.let { it ->
-            RecyclerViewAdapter(
-                it
-            ) {
-                view?.findNavController()
-                    ?.navigate(ListFragmentDirections.actionListFragmentToDetailsFragment(it))
-            }
+        adapter = RecyclerViewAdapter {
+            view?.findNavController()
+                ?.navigate(ListFragmentDirections.actionListFragmentToDetailsFragment(it))
         }
+
         val animate = TranslateAnimation(
             0F,
             0F,
@@ -139,7 +163,7 @@ class ListFragment : Fragment(R.layout.fragment_list) {
     }
 
     private fun getWeatherData(lat: Double, longitude: Double) {
-        viewModel.getWeatherDetails(lat, longitude).observe(this) { resource ->
+        viewModel.getWeatherDetails(lat, longitude).observe(viewLifecycleOwner) { resource ->
             when (resource.status) {
                 Resource.Status.SUCCESS -> {
                     progressDialog.hideLoading()
@@ -225,7 +249,7 @@ class ListFragment : Fragment(R.layout.fragment_list) {
         grantResults: IntArray
     ) {
         Toast.makeText(context, "on request invoked. $requestCode", Toast.LENGTH_SHORT).show()
-        if (requestCode == 34) {
+        if (requestCode == 1) {
             when {
                 grantResults.isEmpty() -> {
                     // If user interaction was interrupted, the permission request is cancelled and you

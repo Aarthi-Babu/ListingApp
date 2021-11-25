@@ -1,6 +1,5 @@
 package com.example.listingapp.view
 
-import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -14,7 +13,6 @@ import com.example.listingapp.database.User
 
 
 class RecyclerViewAdapter(
-    private val context: Context,
     private val clickListener: (position: Int) -> Unit
 ) : RecyclerView.Adapter<RecyclerViewAdapter.SampleViewHolders>() {
     private var itemList: ArrayList<User>? = null
@@ -49,7 +47,7 @@ class RecyclerViewAdapter(
         var name: TextView = itemView.findViewById(R.id.name)
         var cardView: CardView = itemView.findViewById(R.id.card_view)
         fun bind(item: User) {
-            Glide.with(context)
+            Glide.with(itemView.context)
                 .load(item.thumbnail)
                 .placeholder(R.drawable.progress_animation)
                 .centerCrop()

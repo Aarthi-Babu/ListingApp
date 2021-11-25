@@ -10,7 +10,6 @@ import com.example.listingapp.model.WeatherModel
 import com.example.listingapp.service.ListingRepository
 import com.example.listingapp.utils.Resource
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -18,9 +17,12 @@ import javax.inject.Inject
 class ListViewModel @Inject constructor(private val repo: ListingRepository) : ViewModel() {
     val userDetailsResponse = MutableLiveData<ArrayList<User>>()
     val userDetailsFromDb = MutableLiveData<ArrayList<User>>()
-    fun getUserDetails(dbHelper: DatabaseHelperImpl) {
+    fun getUserDetails(dbHelper: DatabaseHelperImpl): MutableLiveData<Resource<ResponseModel>> {
         var userResponse: ResponseModel?
+        val result = MutableLiveData<Resource<ResponseModel>>()
+        result.value = Resource.loading()
         viewModelScope.launch {
+            result.postValue(repo.getDetails())
             userResponse = repo.getDetails()?.data
             val users = mutableListOf<User>()
             val len = userResponse?.results?.size
@@ -55,6 +57,7 @@ class ListViewModel @Inject constructor(private val repo: ListingRepository) : V
             }
             fetchDataFromDb(dbHelper)
         }
+        return result
     }
 
 
@@ -74,7 +77,7 @@ class ListViewModel @Inject constructor(private val repo: ListingRepository) : V
     ): MutableLiveData<Resource<WeatherModel>> {
         val result = MutableLiveData<Resource<WeatherModel>>()
         result.value = Resource.loading()
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             result.postValue(repo.getWeatherData(latitude, longitude))
         }
         return result
