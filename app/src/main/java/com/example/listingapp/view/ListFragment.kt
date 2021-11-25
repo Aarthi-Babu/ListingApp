@@ -5,7 +5,6 @@ import android.Manifest
 import android.app.AlertDialog
 import android.content.ContentValues.TAG
 import android.content.Context
-import android.content.DialogInterface
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
@@ -23,7 +22,7 @@ import android.widget.SearchView
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
+import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.findNavController
 import androidx.recyclerview.widget.RecyclerView
@@ -33,83 +32,89 @@ import com.example.listingapp.database.DatabaseHelperImpl
 import com.example.listingapp.database.User
 import com.example.listingapp.database.UserDatabase
 import com.example.listingapp.databinding.FragmentListBinding
+import com.example.listingapp.di.AppModule
+import com.example.listingapp.utils.ProgressDialog
+import com.example.listingapp.utils.Resource
+import com.example.listingapp.utils.Utils
+import com.example.listingapp.utils.Utils.setStatusBarColor
 import com.example.listingapp.viewmodel.ListViewModel
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.util.*
+import javax.inject.Inject
 import kotlin.collections.ArrayList
 
-
+@AndroidEntryPoint
 class ListFragment : Fragment(R.layout.fragment_list) {
-    private lateinit var binding: FragmentListBinding
-    private var _sGridLayoutManager: StaggeredGridLayoutManager? = null
-    private val viewModel by viewModels<ListViewModel>()
+    private var _binding: FragmentListBinding? = null
+    private val viewModel: ListViewModel by activityViewModels()
     private var adapter: RecyclerViewAdapter? = null
     private var sList: ArrayList<User>? = null
-    private val REQUEST_LOCATION = 1
-    var locationManager: LocationManager? = null
-    private lateinit var scrollListener: RecyclerView.OnScrollListener
+    private var locationManager: LocationManager? = null
+    private val binding get() = _binding!!
+
+    @Inject
+    lateinit var progressDialogFactory: AppModule.ProgressDialogFactory
+    private val progressDialog: ProgressDialog by lazy { progressDialogFactory.create(this.context) }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        binding = FragmentListBinding.inflate(inflater, container, false)
+        _binding = FragmentListBinding.inflate(inflater, container, false)
         return binding.root
 
     }
 
     override fun onStart() {
         super.onStart()
-        activity?.let {
-            ActivityCompat.requestPermissions(
-                it,
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                REQUEST_LOCATION
-            )
-        }
-
+        activity?.setStatusBarColor(R.color.purple_500)
         locationManager = activity?.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         if (!locationManager?.isProviderEnabled(LocationManager.GPS_PROVIDER)!!) {
             onGPS()
         } else {
             getLocation()
         }
+        invokeDB()
+        loadData()
+        recyclerView()
+        viewListener()
+    }
 
-        viewModel.userDetailsResponse.observeForever {
-            lifecycleScope.launch {
-                adapter?.addData(it)
-//                adapter?.notifyDataSetChanged()
+    private fun invokeDB() {
+        val dbHelper = context?.let { UserDatabase.DatabaseBuilder.getInstance(it) }?.let {
+            DatabaseHelperImpl(
+                it
+            )
+        }
+        dbHelper?.let { viewModel.getUserDetails(it) }
+    }
+
+    private fun loadData() {
+        if (Utils.isNetworkAvailable(context)) {
+            viewModel.userDetailsResponse.observeForever {
+                lifecycleScope.launch {
+                    adapter?.addData(it)
+                    sList = it
+                }
+            }
+        } else {
+            viewModel.userDetailsFromDb.value?.let { list ->
+                adapter?.addData(list)
+                sList = list
+
             }
         }
-        invokeDB()
-
-        viewModel.userDetailsFromDb.observe(this, { list ->
-//            recyclerView(list)
-//            adapter?.addData(list)
-
-        })
-        binding.searchView.isIconified = false
-        binding.searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String): Boolean {
-                return false
-            }
-
-            override fun onQueryTextChange(newText: String): Boolean {
-                filter(newText)
-                return false
-            }
-        })
-        scrollListener()
-        recyclerView()
     }
 
     private fun recyclerView() {
         binding.recyclerView.setHasFixedSize(true)
-        _sGridLayoutManager = StaggeredGridLayoutManager(
+        val sGridLayoutManager = StaggeredGridLayoutManager(
             2,
             StaggeredGridLayoutManager.VERTICAL
         )
-        binding.recyclerView.layoutManager = _sGridLayoutManager
+        binding.recyclerView.layoutManager = sGridLayoutManager
 
         adapter = context?.let { it ->
             RecyclerViewAdapter(
@@ -134,17 +139,46 @@ class ListFragment : Fragment(R.layout.fragment_list) {
     }
 
     private fun getWeatherData(lat: Double, longitude: Double) {
-        viewModel.getWeatherDetails(lat, longitude)
-        viewModel.weatherModel.observe(viewLifecycleOwner, {
-            Toast.makeText(context, it.wind?.deg.toString(), Toast.LENGTH_SHORT).show()
-            binding.toolbar.setTemperature(it.wind?.deg.toString())
-            it.name?.let { it1 -> binding.toolbar.setCity(it1) }
-            it.weather?.firstOrNull()?.description?.let { it1 -> binding.toolbar.setArea(it1) }
-        })
+        viewModel.getWeatherDetails(lat, longitude).observe(this) { resource ->
+            when (resource.status) {
+                Resource.Status.SUCCESS -> {
+                    progressDialog.hideLoading()
+                    resource?.data?.let {
+                        Toast.makeText(context, it.wind?.deg.toString(), Toast.LENGTH_SHORT).show()
+                        binding.toolbar.setTemperature(it.wind?.deg.toString())
+                        it.name?.let { it1 -> binding.toolbar.setCity(it1) }
+                        it.weather?.firstOrNull()?.description?.let { it1 ->
+                            binding.toolbar.setArea(
+                                it1
+                            )
+                        }
+                    } ?: Toast.makeText(context, "no location found.", Toast.LENGTH_SHORT).show()
+
+                }
+                Resource.Status.ERROR -> {
+                    progressDialog.hideLoading()
+                    Toast.makeText(context, "weather api error.", Toast.LENGTH_SHORT).show()
+                }
+                Resource.Status.LOADING -> {
+                    progressDialog.showLoading()
+                }
+            }
+        }
     }
 
-    private fun scrollListener() {
-        scrollListener = object : RecyclerView.OnScrollListener() {
+    private fun viewListener() {
+        binding.searchView.isIconified = false
+        binding.searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String): Boolean {
+                return false
+            }
+
+            override fun onQueryTextChange(newText: String): Boolean {
+                filter(newText)
+                return false
+            }
+        })
+        val scrollListener = object : RecyclerView.OnScrollListener() {
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                 super.onScrollStateChanged(recyclerView, newState)
 
@@ -157,31 +191,14 @@ class ListFragment : Fragment(R.layout.fragment_list) {
                             it
                         )
                     }
-                val totalItemCount = (recyclerView.layoutManager?.itemCount)
+                val totalItemCount = sList?.size
                 if (firstVisibleItemPosition?.let { visibleItemCount?.plus(it) }!! == totalItemCount) {
                     Toast.makeText(context, "New load Found..", Toast.LENGTH_SHORT).show()
                     invokeDB()
-//                    binding.recyclerView.removeOnScrollListener(scrollListener)
                 }
             }
         }
         binding.recyclerView.addOnScrollListener(scrollListener)
-    }
-
-    private fun invokeDB() {
-        val dbHelper = context?.let { UserDatabase.DatabaseBuilder.getInstance(it) }?.let {
-            DatabaseHelperImpl(
-                it
-            )
-        }
-        dbHelper?.let { getUserDetails(it) }
-    }
-
-
-    private fun getUserDetails(dbHelper: DatabaseHelperImpl) {
-        viewModel.getUserDetails(dbHelper)
-//        viewModel.fetchDataFromDb(dbHelper)
-
     }
 
     private fun filter(text: String) {
@@ -207,7 +224,7 @@ class ListFragment : Fragment(R.layout.fragment_list) {
         requestCode: Int, permissions: Array<String>,
         grantResults: IntArray
     ) {
-        Log.i(TAG, "onRequestPermissionResult")
+        Toast.makeText(context, "on request invoked. $requestCode", Toast.LENGTH_SHORT).show()
         if (requestCode == 34) {
             when {
                 grantResults.isEmpty() -> {
@@ -239,10 +256,12 @@ class ListFragment : Fragment(R.layout.fragment_list) {
 
     private fun onGPS() {
         val builder: AlertDialog.Builder = AlertDialog.Builder(context)
-        builder.setMessage("Enable GPS").setCancelable(false).setPositiveButton("Yes",
-            DialogInterface.OnClickListener { dialog, which -> startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) })
-            .setNegativeButton("No",
-                DialogInterface.OnClickListener { dialog, which -> dialog.cancel() })
+        builder.setMessage("Enable GPS").setCancelable(false).setPositiveButton(
+            "Yes"
+        ) { _, _ -> startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) }
+            .setNegativeButton(
+                "No"
+            ) { dialog, _ -> dialog.cancel() }
         val alertDialog: AlertDialog = builder.create()
         alertDialog.show()
     }
@@ -262,7 +281,7 @@ class ListFragment : Fragment(R.layout.fragment_list) {
                 ActivityCompat.requestPermissions(
                     it,
                     arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                    REQUEST_LOCATION
+                    1
                 )
             }
         } else {
@@ -270,11 +289,11 @@ class ListFragment : Fragment(R.layout.fragment_list) {
                 locationManager?.getLastKnownLocation(LocationManager.GPS_PROVIDER)
             if (locationGPS != null) {
                 val lat = locationGPS.latitude
-                val longi = locationGPS.longitude
-                getWeatherData(lat, longi)
+                val longitude = locationGPS.longitude
+                getWeatherData(lat, longitude)
                 Toast.makeText(
                     context,
-                    "Your Location: \nLatitude: $lat\nLongitude: $longi",
+                    "Your Location: \nLatitude: $lat\nLongitude: $longitude",
                     Toast.LENGTH_LONG
                 ).show()
             } else {
@@ -294,5 +313,10 @@ class ListFragment : Fragment(R.layout.fragment_list) {
             }
         }
         return minSize
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        _binding = null
     }
 }

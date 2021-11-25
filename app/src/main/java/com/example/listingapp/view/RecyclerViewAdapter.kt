@@ -18,10 +18,6 @@ class RecyclerViewAdapter(
     private val clickListener: (position: Int) -> Unit
 ) : RecyclerView.Adapter<RecyclerViewAdapter.SampleViewHolders>() {
     private var itemList: ArrayList<User>? = null
-    fun populateData(list: ArrayList<User>) {
-        itemList = list
-        notifyDataSetChanged()
-    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SampleViewHolders {
         val layoutView: View = LayoutInflater.from(parent.context).inflate(
@@ -44,11 +40,8 @@ class RecyclerViewAdapter(
     }
 
     fun addData(listItems: ArrayList<User>) {
-        val size = itemList?.size ?: 0
         itemList = listItems
-        val sizeNew = listItems.size
         notifyDataSetChanged()
-//        notifyItemRangeChanged(size, sizeNew)
     }
 
     inner class SampleViewHolders(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -58,6 +51,7 @@ class RecyclerViewAdapter(
         fun bind(item: User) {
             Glide.with(context)
                 .load(item.thumbnail)
+                .placeholder(R.drawable.progress_animation)
                 .centerCrop()
                 .into(image)
             name.text =

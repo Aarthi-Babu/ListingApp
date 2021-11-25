@@ -3,22 +3,25 @@ package com.example.listingapp.viewmodel
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.listingapp.api.ListingRepository
 import com.example.listingapp.database.DatabaseHelperImpl
 import com.example.listingapp.database.User
 import com.example.listingapp.model.ResponseModel
 import com.example.listingapp.model.WeatherModel
+import com.example.listingapp.service.ListingRepository
+import com.example.listingapp.utils.Resource
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class ListViewModel : ViewModel() {
+@HiltViewModel
+class ListViewModel @Inject constructor(private val repo: ListingRepository) : ViewModel() {
     val userDetailsResponse = MutableLiveData<ArrayList<User>>()
-    val weatherModel: MutableLiveData<WeatherModel> by lazy { MutableLiveData<WeatherModel>() }
     val userDetailsFromDb = MutableLiveData<ArrayList<User>>()
-    private val listingRepository: ListingRepository by lazy { ListingRepository() }
     fun getUserDetails(dbHelper: DatabaseHelperImpl) {
         var userResponse: ResponseModel?
         viewModelScope.launch {
-            userResponse = listingRepository.getDetails()
+            userResponse = repo.getDetails()?.data
             val users = mutableListOf<User>()
             val len = userResponse?.results?.size
             if (len != null)
@@ -43,7 +46,6 @@ class ListViewModel : ViewModel() {
                         users.add(user)
                     }
                 }
-//            dbHelper.nukeTable()
             dbHelper.insertAll(users)
             if (userDetailsResponse.value?.isNotEmpty() == true) {
                 userDetailsResponse.value?.addAll(users as ArrayList<User>)
@@ -55,21 +57,27 @@ class ListViewModel : ViewModel() {
         }
     }
 
-    fun <T> MutableLiveData<T>.notifyObserver() {
+
+    private fun <T> MutableLiveData<T>.notifyObserver() {
         this.value = this.value
     }
 
-    fun fetchDataFromDb(dbHelper: DatabaseHelperImpl) {
+    private fun fetchDataFromDb(dbHelper: DatabaseHelperImpl) {
         viewModelScope.launch {
             userDetailsFromDb.postValue(dbHelper.getUsers() as ArrayList<User>?)
         }
     }
 
-    fun getWeatherDetails(latitude: Double, longitude: Double) {
-        viewModelScope.launch {
-            val weatherResponse = listingRepository.getWeatherData(latitude, longitude)
-            weatherModel.postValue(weatherResponse)
+    fun getWeatherDetails(
+        latitude: Double,
+        longitude: Double
+    ): MutableLiveData<Resource<WeatherModel>> {
+        val result = MutableLiveData<Resource<WeatherModel>>()
+        result.value = Resource.loading()
+        viewModelScope.launch(Dispatchers.IO) {
+            result.postValue(repo.getWeatherData(latitude, longitude))
         }
+        return result
     }
 
 }
