@@ -8,14 +8,12 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import com.bumptech.glide.Glide
-import com.example.listingapp.R
 import com.example.listingapp.database.User
 import com.example.listingapp.databinding.FragmentUserDetailsBinding
 import com.example.listingapp.di.AppModule
 import com.example.listingapp.utils.ProgressDialog
 import com.example.listingapp.utils.Resource
-import com.example.listingapp.utils.isNetworkAvailable
-import com.example.listingapp.utils.setStatusBarColor
+import com.example.listingapp.utils.isNetworkConnected
 import com.example.listingapp.viewmodel.ListViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -42,13 +40,12 @@ class DetailsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         super.onStart()
-        activity?.setStatusBarColor(R.color.purple_500)
         loadData()
     }
 
     private fun loadData() {
         val position = DetailsFragmentArgs.fromBundle(requireArguments()).position
-        if (isNetworkAvailable(context)) {
+        if (context?.isNetworkConnected() == true) {
             viewModel.userDetailsResponse.value?.let {
                 populateData(it, position)
             }
@@ -92,8 +89,6 @@ class DetailsFragment : Fragment() {
                 Resource.Status.SUCCESS -> {
                     progressDialog.hideLoading()
                     resource?.data?.let {
-
-                        Toast.makeText(context, it.wind?.deg.toString(), Toast.LENGTH_SHORT).show()
                         binding.toolbar.setTemperature(it.wind?.deg.toString())
                         it.name?.let { it1 -> binding.toolbar.setCity(it1) }
                         it.weather?.firstOrNull()?.description?.let { it1 ->

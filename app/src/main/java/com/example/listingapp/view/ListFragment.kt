@@ -3,24 +3,24 @@ package com.example.listingapp.view
 
 import android.Manifest
 import android.app.AlertDialog
-import android.content.ContentValues.TAG
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.TranslateAnimation
-import android.widget.SearchView
 import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.widget.SearchView
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -28,22 +28,18 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.findNavController
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
-import com.example.listingapp.R
 import com.example.listingapp.database.DatabaseHelperImpl
 import com.example.listingapp.database.User
 import com.example.listingapp.database.UserDatabase
 import com.example.listingapp.databinding.FragmentListBinding
-import com.example.listingapp.di.AppModule
-import com.example.listingapp.utils.ProgressDialog
 import com.example.listingapp.utils.Resource
-import com.example.listingapp.utils.isNetworkAvailable
-import com.example.listingapp.utils.setStatusBarColor
+import com.example.listingapp.utils.isNetworkConnected
 import com.example.listingapp.viewmodel.ListViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.util.*
-import javax.inject.Inject
 import kotlin.collections.ArrayList
+
 
 @AndroidEntryPoint
 class ListFragment : Fragment() {
@@ -53,10 +49,7 @@ class ListFragment : Fragment() {
     private var sList: ArrayList<User>? = null
     private var locationManager: LocationManager? = null
     private val binding get() = _binding!!
-
-    @Inject
-    lateinit var progressDialogFactory: AppModule.ProgressDialogFactory
-    private val progressDialog: ProgressDialog by lazy { progressDialogFactory.create(this.context) }
+    private var requestPermissionLauncher: ActivityResultLauncher<String>? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -68,32 +61,29 @@ class ListFragment : Fragment() {
 
     }
 
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        requestPermissionLauncher =
+            registerForActivityResult(
+                ActivityResultContracts.RequestPermission()
+            ) { isGranted: Boolean ->
+                if (isGranted) {
+                    getLocation()
+                } else {
+                    onGPS()
+                }
+            }
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         super.onStart()
-        activity?.setStatusBarColor(R.color.purple_500)
-        locationManager = activity?.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        if (!locationManager?.isProviderEnabled(LocationManager.GPS_PROVIDER)!!) {
-            onGPS()
-        } else {
-            getLocation()
-        }
         invokeDB()
         loadData()
         recyclerView()
         viewListener()
-//        val permissionsResultCallback = registerForActivityResult(
-//            ActivityResultContracts.RequestPermission()
-//        ) {
-//            when (it) {
-//                true -> {
-//                    println("Permission has been granted by user")
-//                }
-//                false -> {
-//                    Toast.makeText(requireContext(), "Permission denied", Toast.LENGTH_SHORT).show()
-//                }
-//            }
-//        }
+        getLocation()
+
     }
 
     private fun invokeDB() {
@@ -119,7 +109,7 @@ class ListFragment : Fragment() {
     }
 
     private fun loadData() {
-        if (isNetworkAvailable(context)) {
+        if (context?.isNetworkConnected() == true) {
             viewModel.userDetailsResponse.observeForever {
                 lifecycleScope.launch {
                     adapter?.addData(it)
@@ -166,9 +156,7 @@ class ListFragment : Fragment() {
         viewModel.getWeatherDetails(lat, longitude).observe(viewLifecycleOwner) { resource ->
             when (resource.status) {
                 Resource.Status.SUCCESS -> {
-                    progressDialog.hideLoading()
                     resource?.data?.let {
-                        Toast.makeText(context, it.wind?.deg.toString(), Toast.LENGTH_SHORT).show()
                         binding.toolbar.setTemperature(it.wind?.deg.toString())
                         it.name?.let { it1 -> binding.toolbar.setCity(it1) }
                         it.weather?.firstOrNull()?.description?.let { it1 ->
@@ -180,11 +168,10 @@ class ListFragment : Fragment() {
 
                 }
                 Resource.Status.ERROR -> {
-                    progressDialog.hideLoading()
                     Toast.makeText(context, "weather api error.", Toast.LENGTH_SHORT).show()
                 }
                 Resource.Status.LOADING -> {
-                    progressDialog.showLoading()
+                    //
                 }
             }
         }
@@ -192,6 +179,7 @@ class ListFragment : Fragment() {
 
     private fun viewListener() {
         binding.searchView.isIconified = false
+        binding.searchView.clearFocus()
         binding.searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String): Boolean {
                 return false
@@ -217,7 +205,6 @@ class ListFragment : Fragment() {
                     }
                 val totalItemCount = sList?.size
                 if (firstVisibleItemPosition?.let { visibleItemCount?.plus(it) }!! == totalItemCount) {
-                    Toast.makeText(context, "New load Found..", Toast.LENGTH_SHORT).show()
                     invokeDB()
                 }
             }
@@ -238,51 +225,30 @@ class ListFragment : Fragment() {
         }
         if (filteredList.isEmpty()) {
             Toast.makeText(context, "No Data Found..", Toast.LENGTH_SHORT).show()
+            adapter?.filterList(filteredList)
         } else {
             adapter?.filterList(filteredList)
         }
     }
 
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int, permissions: Array<String>,
-        grantResults: IntArray
-    ) {
-        Toast.makeText(context, "on request invoked. $requestCode", Toast.LENGTH_SHORT).show()
-        if (requestCode == 1) {
-            when {
-                grantResults.isEmpty() -> {
-                    // If user interaction was interrupted, the permission request is cancelled and you
-                    // receive empty arrays.
-                    Log.i(TAG, "User interaction was cancelled.")
-                }
-                grantResults[0] == PackageManager.PERMISSION_GRANTED -> {
-                    // Permission granted.
-                    getLocation()
-                }
-                else -> {
-                    View.OnClickListener {
-                        // Build intent that displays the App settings screen.
-                        val intent = Intent()
-                        intent.action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
-                        val uri = Uri.fromParts(
-                            "package",
-                            Build.DISPLAY, null
-                        )
-                        intent.data = uri
-                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                        startActivity(intent)
-                    }
-                }
-            }
-        }
+    private fun openAppInfo() {
+        val intent = Intent()
+        intent.action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+        val uri = Uri.fromParts(
+            "package",
+            context?.packageName, null
+        )
+        intent.data = uri
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        startActivity(intent)
     }
 
     private fun onGPS() {
         val builder: AlertDialog.Builder = AlertDialog.Builder(context)
-        builder.setMessage("Enable GPS").setCancelable(false).setPositiveButton(
-            "Yes"
-        ) { _, _ -> startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) }
+        builder.setMessage("Enable Location it will help you to have better experience")
+            .setCancelable(false).setPositiveButton(
+                "Yes"
+            ) { _, _ -> openAppInfo() }
             .setNegativeButton(
                 "No"
             ) { dialog, _ -> dialog.cancel() }
@@ -291,37 +257,39 @@ class ListFragment : Fragment() {
     }
 
     private fun getLocation() {
-        if (context?.let {
-                ActivityCompat.checkSelfPermission(
-                    it, Manifest.permission.ACCESS_FINE_LOCATION
+        locationManager = activity?.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        when {
+            context?.let {
+                ContextCompat.checkSelfPermission(
+                    it,
+                    Manifest.permission.ACCESS_FINE_LOCATION
                 )
-            } != PackageManager.PERMISSION_GRANTED && context?.let {
+            } == PackageManager.PERMISSION_GRANTED && context?.let {
                 ActivityCompat.checkSelfPermission(
                     it, Manifest.permission.ACCESS_COARSE_LOCATION
                 )
-            } != PackageManager.PERMISSION_GRANTED
-        ) {
-            activity?.let {
-                ActivityCompat.requestPermissions(
-                    it,
-                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                    1
-                )
+            } == PackageManager.PERMISSION_GRANTED -> {
+                val locationGPS: Location? =
+                    locationManager?.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                if (locationGPS != null) {
+                    val lat = locationGPS.latitude
+                    val longitude = locationGPS.longitude
+                    getWeatherData(lat, longitude)
+                } else {
+                    Toast.makeText(context, "Unable to find location.", Toast.LENGTH_SHORT).show()
+                }
             }
-        } else {
-            val locationGPS: Location? =
-                locationManager?.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-            if (locationGPS != null) {
-                val lat = locationGPS.latitude
-                val longitude = locationGPS.longitude
-                getWeatherData(lat, longitude)
+            shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION) -> {
                 Toast.makeText(
                     context,
-                    "Your Location: \nLatitude: $lat\nLongitude: $longitude",
-                    Toast.LENGTH_LONG
+                    "please allow location for better experience.",
+                    Toast.LENGTH_SHORT
                 ).show()
-            } else {
-                Toast.makeText(context, "Unable to find location.", Toast.LENGTH_SHORT).show()
+            }
+            else -> {
+                requestPermissionLauncher?.launch(
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                )
             }
         }
     }
